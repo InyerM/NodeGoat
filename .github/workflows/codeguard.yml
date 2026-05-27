@@ -1,0 +1,16 @@
+name: CodeGuard scan
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+jobs:
+  codeguard:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        run: |
+          BODY=$(jq -nc --arg sha "$GITHUB_SHA" --arg branch "${GITHUB_REF#refs/heads/}" --arg run_id "$GITHUB_RUN_ID" '{commit_sha:$sha, branch:$branch, triggered_by:"github-actions", github_run_id:$run_id}')
+          SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "${{ secrets.CODEGUARD_WEBHOOK_SECRET }}" -hex | awk '{print $2}')
+          curl -fsS -X POST "${{ secrets.CODEGUARD_API_URL }}/webhooks/scan" -H "X-CodeGuard-Project: ${{ secrets.CODEGUARD_PROJECT_ID }}" -H "X-CodeGuard-Signature: sha256=$SIG" -H "Content-Type: application/json" --data-binary "$BODY"
